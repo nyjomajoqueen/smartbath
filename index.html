@@ -1,0 +1,76 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>SmartBath Control Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8">
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  <style>
+    body { font-family: Arial; text-align: center; margin-top: 50px; background: #f4f4f4; }
+    h1 { color: #333; }
+    .card { background: white; padding: 20px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 10px; width: 300px; }
+    .status { font-size: 24px; font-weight: bold; margin: 20px; }
+    .btn { background: #3498db; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; cursor: pointer; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <h1>Панель управления SmartBath</h1>
+  
+  <div class="card">
+    <h3>Состояние системы</h3>
+    <div id="status-text" class="status">Загрузка...</div>
+  </div>
+
+  <div class="card">
+    <h3>Температура воды</h3>
+    <div id="temp-text" class="status" style="color: #2980b9;">--.- &deg;C</div>
+  </div>
+
+  <div style="margin-top: 20px;">
+    <button class="btn" onclick="resetSystem()">Открыть воду (Сброс)</button>
+  </div>
+
+  <script>
+    // Твои реальные данные базы данных:
+    const firebaseConfig = {
+      apiKey: "AIzaSyDvXE9Fkod5YTSEsSbGjY-Gxm_lC6qCuz8",
+      databaseURL: "https://smartbath-7cde1-default-rtdb.firebaseio.com/"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // Чтение данных из облака в реальном времени
+    database.ref("smartbath").on("value", (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const statusText = document.getElementById("status-text");
+        if (data.status == "IDLE") {
+          statusText.innerText = "Идет набор воды...";
+          statusText.style.color = "#2ecc71";
+        } else if (data.status == "WET_ALARM") {
+          statusText.innerText = "ВНИМАНИЕ! Вода набралась!";
+          statusText.style.color = "#e74c3c";
+        } else if (data.status == "SHUT_OFF") {
+          statusText.innerText = "КЛАПАН ЗАКРЫТ. Ванна готова!";
+          statusText.style.color = "#7f8c8d";
+        }
+        
+        if (data.temp > -50.0 && data.temp < 100.0 && data.temp != 0.0) {
+          document.getElementById("temp-text").innerHTML = data.temp.toFixed(1) + " &deg;C";
+        } else {
+          document.getElementById("temp-text").innerHTML = "измеряется...";
+        }
+      }
+    });
+
+    // Функция кнопки сброса (открытия воды)
+    function resetSystem() {
+      database.ref("smartbath").update({
+        status: "RESET"
+      });
+    }
+  </script>
+</body>
+</html>
