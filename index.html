@@ -13,7 +13,6 @@
     .status { font-size: 24px; font-weight: bold; margin: 20px; min-height: 35px; }
     .btn { background: #3498db; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; cursor: pointer; text-decoration: none; transition: background 0.2s; }
     .btn:hover { background: #2980b9; }
-    .btn:disabled { background: #bdc3c7; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -21,7 +20,7 @@
   
   <div class="card">
     <h3>Состояние системы</h3>
-    <div id="status-text" class="status">Подключение...</div>
+    <div id="status-text" class="status">Загрузка...</div>
   </div>
 
   <div class="card">
@@ -30,74 +29,50 @@
   </div>
 
   <div style="margin-top: 20px;">
-    <button id="reset-btn" class="btn" onclick="resetSystem()">Открыть воду (Сброс)</button>
+    <button class="btn" onclick="resetSystem()">Открыть воду (Сброс)</button>
   </div>
 
   <script>
-    // Конфигурация базы данных Firebase
+    // Твои реальные данные базы данных:
     const firebaseConfig = {
       apiKey: "AIzaSyDvXE9Fkod5YTSEsSbGjY-Gxm_lC6qCuz8",
       databaseURL: "https://smartbath-7cde1-default-rtdb.firebaseio.com/"
     };
     
-    // Инициализация Firebase
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
-
-    const statusText = document.getElementById("status-text");
-    const tempText = document.getElementById("temp-text");
-    const resetBtn = document.getElementById("reset-btn");
 
     // Чтение данных из облака в реальном времени
     database.ref("smartbath").on("value", (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        // Обработка статусов системы
-        if (data.status === "IDLE") {
+        const statusText = document.getElementById("status-text");
+        
+        // Если статус IDLE или RESET (после нажатия кнопки), показываем "Идет набор..."
+        if (data.status === "IDLE" || data.status === "RESET") {
           statusText.innerText = "Идет набор воды...";
           statusText.style.color = "#2ecc71";
-          resetBtn.disabled = false;
         } else if (data.status === "WET_ALARM") {
           statusText.innerText = "ВНИМАНИЕ! Вода набралась!";
           statusText.style.color = "#e74c3c";
-          resetBtn.disabled = false;
         } else if (data.status === "SHUT_OFF") {
           statusText.innerText = "КЛАПАН ЗАКРЫТ. Ванна готова!";
           statusText.style.color = "#7f8c8d";
-          resetBtn.disabled = false;
-        } else if (data.status === "RESET") {
-          statusText.innerText = "Открытие клапана...";
-          statusText.style.color = "#f39c12";
-          resetBtn.disabled = true; // Блокируем кнопку на время обработки
         }
         
-        // Обработка показаний температуры
+        // Отображение температуры
         if (data.temp !== undefined && data.temp > -50.0 && data.temp < 100.0 && data.temp !== 0.0) {
-          tempText.innerHTML = data.temp.toFixed(1) + " &deg;C";
+          document.getElementById("temp-text").innerHTML = data.temp.toFixed(1) + " &deg;C";
         } else {
-          tempText.innerHTML = "измеряется...";
+          document.getElementById("temp-text").innerHTML = "измеряется...";
         }
       }
-    }, (error) => {
-      console.error("Ошибка чтения данных из Firebase:", error);
-      statusText.innerText = "Ошибка сети";
-      statusText.style.color = "#e74c3c";
     });
 
     // Функция кнопки сброса (открытия воды)
     function resetSystem() {
-      resetBtn.disabled = true;
-      statusText.innerText = "Отправка команды...";
-      statusText.style.color = "#f39c12";
-
       database.ref("smartbath").update({
         status: "RESET"
-      }).then(() => {
-        console.log("Команда RESET отправлена в Firebase.");
-      }).catch((error) => {
-        console.error("Ошибка при отправке команды:", error);
-        alert("Не удалось отправить команду. Проверьте подключение к интернету.");
-        resetBtn.disabled = false;
       });
     }
   </script>
