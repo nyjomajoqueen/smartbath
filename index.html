@@ -59,12 +59,10 @@
       }
 
       if (lastDisplayedTemp === null) {
-        // Первое полученное значение выводим сразу
         lastDisplayedTemp = newTemp;
         tempText.innerHTML = lastDisplayedTemp.toFixed(1) + " &deg;C";
         tempText.style.color = "#2980b9";
       } else {
-        // Проверяем разницу между новым значением и тем, что на экране
         const difference = Math.abs(newTemp - lastDisplayedTemp);
         if (difference >= 0.3) {
           lastDisplayedTemp = newTemp;
@@ -79,7 +77,7 @@
       const data = snapshot.val();
       if (data) {
         
-        // Состояние: Идет набор воды
+        // 1. Идет набор воды (IDLE или RESET)
         if (data.status === "IDLE" || data.status === "RESET") {
           statusText.innerText = "Идет набор воды...";
           statusText.style.color = "#2ecc71";
@@ -91,8 +89,8 @@
             tempText.style.color = "#2980b9";
           }
         } 
-        // Состояние: Набор воды прекращен
-        else if (data.status === "WET_ALARM" || data.status === "SHUT_OFF") {
+        // 2. Сработал датчик (WET_ALARM) — Набор прекращен, показываем температуру
+        else if (data.status === "WET_ALARM") {
           statusText.innerText = "Набор воды прекращен";
           statusText.style.color = "#e74c3c";
           
@@ -106,7 +104,7 @@
             tempText.style.color = "#7f8c8d";
           }
         } 
-        // По умолчанию (Покой)
+        // 3. Подача прекращена вручную / Система в покое (SHUT_OFF или любой другой статус)
         else {
           statusText.innerText = "В покое";
           statusText.style.color = "#7f8c8d";
@@ -119,7 +117,7 @@
 
     // Функция клика: Начало набора воды
     function startFilling() {
-      lastDisplayedTemp = null; // Сброс для нового цикла измерений
+      lastDisplayedTemp = null; // Сброс температуры для нового измерения
       database.ref("smartbath").update({
         status: "RESET"
       });
