@@ -50,21 +50,21 @@
     const statusText = document.getElementById("status-text");
     const tempText = document.getElementById("temp-text");
 
-    let lastDisplayedTemp = null; // Переменная для хранения отображаемой температуры
+    let lastDisplayedTemp = null; // Хранение текущей температуры на экране
 
-    // Обработка температуры по вашему условию (обновление только при изменении >= 0.3 градуса)
+    // Функция фильтрации температуры (обновление только при изменении >= 0.3°C)
     function processTemperature(newTemp) {
       if (newTemp === undefined || newTemp <= -50.0 || newTemp >= 100.0 || newTemp === 0.0) {
         return; 
       }
 
       if (lastDisplayedTemp === null) {
-        // Первое измерение выводим сразу
+        // Первое полученное значение выводим сразу
         lastDisplayedTemp = newTemp;
         tempText.innerHTML = lastDisplayedTemp.toFixed(1) + " &deg;C";
         tempText.style.color = "#2980b9";
       } else {
-        // Проверяем разницу между новым и старым значением
+        // Проверяем разницу между новым значением и тем, что на экране
         const difference = Math.abs(newTemp - lastDisplayedTemp);
         if (difference >= 0.3) {
           lastDisplayedTemp = newTemp;
@@ -74,11 +74,12 @@
       }
     }
 
-    // Слушатель событий базы данных
+    // Слушатель базы данных Firebase
     database.ref("smartbath").on("value", (snapshot) => {
       const data = snapshot.val();
       if (data) {
         
+        // Состояние: Идет набор воды
         if (data.status === "IDLE" || data.status === "RESET") {
           statusText.innerText = "Идет набор воды...";
           statusText.style.color = "#2ecc71";
@@ -90,13 +91,14 @@
             tempText.style.color = "#2980b9";
           }
         } 
+        // Состояние: Набор воды прекращен
         else if (data.status === "WET_ALARM" || data.status === "SHUT_OFF") {
           statusText.innerText = "Набор воды прекращен";
           statusText.style.color = "#e74c3c";
           
-          // Показываем зафиксированную температуру на момент отключения
           if (lastDisplayedTemp !== null) {
             tempText.innerHTML = lastDisplayedTemp.toFixed(1) + " &deg;C";
+            tempText.style.color = "#333";
           } else if (data.temp !== undefined) {
             processTemperature(data.temp);
           } else {
@@ -104,8 +106,8 @@
             tempText.style.color = "#7f8c8d";
           }
         } 
+        // По умолчанию (Покой)
         else {
-          // Если статус неопределен или равен другому значению
           statusText.innerText = "В покое";
           statusText.style.color = "#7f8c8d";
           tempText.innerText = "не измеряется";
@@ -115,15 +117,15 @@
       }
     });
 
-    // Функция кнопки: Начало набора воды
+    // Функция клика: Начало набора воды
     function startFilling() {
-      lastDisplayedTemp = null; // Сбрасываем старую температуру для нового измерения
+      lastDisplayedTemp = null; // Сброс для нового цикла измерений
       database.ref("smartbath").update({
         status: "RESET"
       });
     }
 
-    // Функция кнопки: Прекратить подачу воды
+    // Функция клика: Прекратить подачу воды
     function stopFilling() {
       database.ref("smartbath").update({
         status: "SHUT_OFF"
