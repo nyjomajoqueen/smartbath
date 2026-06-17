@@ -11,9 +11,12 @@
     h1 { color: #333; }
     .card { background: white; padding: 20px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 10px; width: 300px; vertical-align: top; }
     .status { font-size: 24px; font-weight: bold; margin: 20px; min-height: 35px; }
-    .btn { background: #3498db; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; cursor: pointer; text-decoration: none; transition: background 0.2s; }
-    .btn:hover { background: #2980b9; }
-    .btn:disabled { background: #bdc3c7; cursor: not-allowed; }
+    .btn-container { margin-top: 30px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
+    .btn { color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; cursor: pointer; text-decoration: none; transition: background 0.2s; width: 280px; font-weight: bold; }
+    .btn-start { background: #2ecc71; }
+    .btn-start:hover { background: #27ae60; }
+    .btn-stop { background: #e74c3c; }
+    .btn-stop:hover { background: #c0392b; }
   </style>
 </head>
 <body>
@@ -21,24 +24,21 @@
   
   <div class="card">
     <h3>Состояние системы</h3>
-    <div id="status-text" class="status" style="color: #7f8c8d;">Проверка связи...</div>
+    <div id="status-text" class="status" style="color: #7f8c8d;">В покое</div>
   </div>
 
   <div class="card">
     <h3>Температура воды</h3>
-    <div id="temp-text" class="status" style="color: #7f8c8d;">--.- &deg;C</div>
+    <div id="temp-text" class="status" style="color: #7f8c8d;">не измеряется</div>
   </div>
 
-  <div style="margin-top: 20px;">
-    <button id="reset-btn" class="btn" onclick="resetSystem()" disabled>Открыть воду (Сброс)</button>
+  <div class="btn-container">
+    <button class="btn btn-start" onclick="startFilling()">Начало набора воды</button>
+    <button class="btn btn-stop" onclick="stopFilling()">Прекратить подачу воды</button>
   </div>
 
   <script>
-    // === НАСТРОЙКА ===
-    // Впишите сюда IP-адрес Блока Б, который он получает в вашей домашней сети Wi-Fi:
-    const DEVICE_IP = "192.168.1.100"; 
-    // =================
-
+    // Конфигурация Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyDvXE9Fkod5YTSEsSbGjY-Gxm_lC6qCuz8",
       databaseURL: "https://smartbath-7cde1-default-rtdb.firebaseio.com/"
@@ -49,78 +49,84 @@
 
     const statusText = document.getElementById("status-text");
     const tempText = document.getElementById("temp-text");
-    const resetBtn = document.getElementById("reset-btn");
 
-    let lastDatabaseState = null;
-    let isDeviceOnline = false;
+    let lastDisplayedTemp = null; // Переменная для хранения отображаемой температуры
 
-    // Чтение данных из Firebase
-    database.ref("smartbath").on("value", (snapshot) => {
-      lastDatabaseState = snapshot.val();
-      updateUI();
-    });
-
-    // Функция обновления интерфейса в зависимости от того, в сети ли платы
-    function updateUI() {
-      if (!isDeviceOnline) {
-        statusText.innerText = "Устройства выключены";
-        statusText.style.color = "#7f8c8d";
-        tempText.innerHTML = "нет связи...";
-        tempText.style.color = "#7f8c8d";
-        resetBtn.disabled = true;
-        return;
+    // Обработка температуры по вашему условию (обновление только при изменении >= 0.3 градуса)
+    function processTemperature(newTemp) {
+      if (newTemp === undefined || newTemp <= -50.0 || newTemp >= 100.0 || newTemp === 0.0) {
+        return; 
       }
 
-      // Если платы в сети, показываем данные из базы
-      if (lastDatabaseState) {
-        resetBtn.disabled = false;
+      if (lastDisplayedTemp === null) {
+        // Первое измерение выводим сразу
+        lastDisplayedTemp = newTemp;
+        tempText.innerHTML = lastDisplayedTemp.toFixed(1) + " &deg;C";
+        tempText.style.color = "#2980b9";
+      } else {
+        // Проверяем разницу между новым и старым значением
+        const difference = Math.abs(newTemp - lastDisplayedTemp);
+        if (difference >= 0.3) {
+          lastDisplayedTemp = newTemp;
+          tempText.innerHTML = lastDisplayedTemp.toFixed(1) + " &deg;C";
+          tempText.style.color = "#2980b9";
+        }
+      }
+    }
+
+    // Слушатель событий базы данных
+    database.ref("smartbath").on("value", (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
         
-        if (lastDatabaseState.status === "IDLE" || lastDatabaseState.status === "RESET") {
+        if (data.status === "IDLE" || data.status === "RESET") {
           statusText.innerText = "Идет набор воды...";
           statusText.style.color = "#2ecc71";
-        } else if (lastDatabaseState.status === "WET_ALARM") {
-          statusText.innerText = "ВНИМАНИЕ! Вода набралась!";
+          
+          if (data.temp !== undefined) {
+            processTemperature(data.temp);
+          } else {
+            tempText.innerText = "измеряется...";
+            tempText.style.color = "#2980b9";
+          }
+        } 
+        else if (data.status === "WET_ALARM" || data.status === "SHUT_OFF") {
+          statusText.innerText = "Набор воды прекращен";
           statusText.style.color = "#e74c3c";
-        } else if (lastDatabaseState.status === "SHUT_OFF") {
-          statusText.innerText = "КЛАПАН ЗАКРЫТ. Ванна готова!";
+          
+          // Показываем зафиксированную температуру на момент отключения
+          if (lastDisplayedTemp !== null) {
+            tempText.innerHTML = lastDisplayedTemp.toFixed(1) + " &deg;C";
+          } else if (data.temp !== undefined) {
+            processTemperature(data.temp);
+          } else {
+            tempText.innerText = "не измеряется";
+            tempText.style.color = "#7f8c8d";
+          }
+        } 
+        else {
+          // Если статус неопределен или равен другому значению
+          statusText.innerText = "В покое";
           statusText.style.color = "#7f8c8d";
-        }
-        
-        if (lastDatabaseState.temp !== undefined && lastDatabaseState.temp > -50.0 && lastDatabaseState.temp < 100.0 && lastDatabaseState.temp !== 0.0) {
-          tempText.innerHTML = lastDatabaseState.temp.toFixed(1) + " &deg;C";
-          tempText.style.color = "#2980b9";
-        } else {
-          tempText.innerHTML = "измеряется...";
+          tempText.innerText = "не измеряется";
           tempText.style.color = "#7f8c8d";
+          lastDisplayedTemp = null;
         }
       }
-    }
+    });
 
-    // Функция проверки связи с Блоком Б по локальной сети
-    function pingDevice() {
-      // Пытаемся сделать быстрый запрос к Блоку Б
-      fetch(`http://${DEVICE_IP}/water`, { mode: 'no-cors', cache: 'no-store' })
-        .then(() => {
-          if (!isDeviceOnline) {
-            isDeviceOnline = true;
-            updateUI();
-          }
-        })
-        .catch(() => {
-          if (isDeviceOnline || statusText.innerText === "Проверка связи...") {
-            isDeviceOnline = false;
-            updateUI();
-          }
-        });
-    }
-
-    // Запускаем постоянную проверку связи каждые 5 секунд
-    setInterval(pingDevice, 5000);
-    pingDevice(); // Первый запуск сразу
-
-    function resetSystem() {
+    // Функция кнопки: Начало набора воды
+    function startFilling() {
+      lastDisplayedTemp = null; // Сбрасываем старую температуру для нового измерения
       database.ref("smartbath").update({
         status: "RESET"
+      });
+    }
+
+    // Функция кнопки: Прекратить подачу воды
+    function stopFilling() {
+      database.ref("smartbath").update({
+        status: "SHUT_OFF"
       });
     }
   </script>
