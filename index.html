@@ -5,54 +5,66 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Смарт Ванна</title>
     <style>
-        /* Мягкий приглушенный фон-градиент */
+        /* Главный фон */
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: linear-gradient(180deg, #e6eff9 0%, #cfe1f3 100%); 
+            background: linear-gradient(180deg, #7a94a8 0%, #4a6275 100%); 
             text-align: center; 
             padding: 20px; 
             max-width: 480px; 
             margin: 0 auto;
-            min-height: 90vh;
+            min-height: 92vh;
             display: flex;
             flex-direction: column;
             justify-content: center;
             position: relative;
-            color: #4a5568;
+            color: #2d3748;
         }
 
-        /* Эффект матового стекла для карточек */
+        /* Название станции вверху */
+        .main-title {
+            font-size: 26px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-top: 10px;
+            margin-bottom: 25px;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            letter-spacing: 0.5px;
+        }
+
+        /* Карточки с эффектом стекла */
         .window { 
-            background: rgba(255, 255, 255, 0.65); 
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.75); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.45);
             padding: 22px; 
             margin-bottom: 20px; 
             border-radius: 16px; 
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
         }
 
         .title { 
             font-size: 14px; 
             font-weight: 600; 
-            color: #718096; 
+            color: #5a6578; 
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-bottom: 12px; 
         }
 
         .value { 
-            font-size: 20px; 
+            font-size: 21px; 
             font-weight: bold; 
-            color: #2d3748; 
+            color: #1a202c; 
         }
 
         .buttons-container {
             margin-top: 10px;
+            margin-bottom: 20px;
         }
 
-        /* Кнопки с приглушенными цветами */
+        /* Кнопки */
         button { 
             width: 100%; 
             padding: 16px; 
@@ -64,24 +76,34 @@
             border-radius: 12px; 
             cursor: pointer; 
             transition: transform 0.1s, opacity 0.2s;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
         
         button:active {
             transform: scale(0.98);
         }
 
-        /* Приглушенный коралловый */
         .btn-stop { 
             background-color: #d37a72; 
         } 
         
-        /* Приглушенный стальной/синий */
         .btn-idle { 
-            background-color: #7b9cb5; 
+            background-color: #698da8; 
         } 
 
-        /* АНИМАЦИЯ ПУЗЫРЬКОВ */
+        /* Белая полоска в самом низу экрана */
+        .bottom-line {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: rgba(255, 255, 255, 0.85);
+            box-shadow: 0 -2px 10px rgba(255, 255, 255, 0.1);
+            z-index: 10;
+        }
+
+        /* Пузырьки */
         .bubble-wrapper {
             position: fixed;
             top: 0;
@@ -89,28 +111,28 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            z-index: -1; /* Пузыри строго на заднем фоне */
+            z-index: -1;
             pointer-events: none;
         }
 
         .bubble {
             position: absolute;
             bottom: -100px;
-            background: rgba(255, 255, 255, 0.35);
-            border: 1px solid rgba(255, 255, 255, 0.45);
+            background: rgba(255, 255, 255, 0.45); 
+            border: 1px solid rgba(255, 255, 255, 0.6);  
             border-radius: 50%;
             animation: floatUp 15s infinite ease-in;
+            box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.4); 
         }
 
-        /* Разные размеры и время для пузырей */
-        .bubble:nth-child(1) { left: 10%; width: 40px; height: 40px; animation-delay: 0s; animation-duration: 14s; }
-        .bubble:nth-child(2) { left: 25%; width: 20px; height: 20px; animation-delay: 3s; animation-duration: 18s; }
-        .bubble:nth-child(3) { left: 40%; width: 55px; height: 55px; animation-delay: 1s; animation-duration: 22s; }
-        .bubble:nth-child(4) { left: 60%; width: 30px; height: 30px; animation-delay: 5s; animation-duration: 16s; }
-        .bubble:nth-child(5) { left: 75%; width: 45px; height: 45px; animation-delay: 2s; animation-duration: 20s; }
-        .bubble:nth-child(6) { left: 90%; width: 25px; height: 25px; animation-delay: 7s; animation-duration: 15s; }
-        .bubble:nth-child(7) { left: 15%; width: 35px; height: 35px; animation-delay: 9s; animation-duration: 19s; }
-        .bubble:nth-child(8) { left: 50%; width: 50px; height: 50px; animation-delay: 11s; animation-duration: 21s; }
+        .bubble:nth-child(1) { left: 8%; width: 42px; height: 42px; animation-delay: 0s; animation-duration: 14s; }
+        .bubble:nth-child(2) { left: 25%; width: 22px; height: 22px; animation-delay: 3s; animation-duration: 18s; }
+        .bubble:nth-child(3) { left: 38%; width: 55px; height: 55px; animation-delay: 1s; animation-duration: 22s; }
+        .bubble:nth-child(4) { left: 58%; width: 28px; height: 28px; animation-delay: 5s; animation-duration: 16s; }
+        .bubble:nth-child(5) { left: 72%; width: 48px; height: 48px; animation-delay: 2s; animation-duration: 20s; }
+        .bubble:nth-child(6) { left: 88%; width: 24px; height: 24px; animation-delay: 7s; animation-duration: 15s; }
+        .bubble:nth-child(7) { left: 14%; width: 34px; height: 34px; animation-delay: 9s; animation-duration: 19s; }
+        .bubble:nth-child(8) { left: 52%; width: 52px; height: 52px; animation-delay: 11s; animation-duration: 21s; }
 
         @keyframes floatUp {
             0% {
@@ -118,10 +140,10 @@
                 opacity: 0;
             }
             10% {
-                opacity: 1;
+                opacity: 0.8;
             }
             90% {
-                opacity: 1;
+                opacity: 0.8;
             }
             100% {
                 transform: translateY(-120vh) scale(0.6);
@@ -144,6 +166,12 @@
         <div class="bubble"></div>
     </div>
 
+    <!-- Тонкая белая полоска на самом нижнем краю экрана -->
+    <div class="bottom-line"></div>
+
+    <!-- Название станции сверху по центру -->
+    <h1 class="main-title">Станция "Smart Bath"</h1>
+
     <!-- Состояние системы -->
     <div class="window">
         <div class="title">Состояние системы</div>
@@ -156,7 +184,7 @@
         <div class="value" id="temp-window">--</div>
     </div>
 
-    <!-- Кнопки управления без номеров -->
+    <!-- Кнопки управления -->
     <div class="buttons-container">
         <button class="btn-stop" onclick="sendCommand('stopped')">Прекратить подачу воды</button>
         <button class="btn-idle" onclick="sendCommand('idle')">Состояние покоя</button>
