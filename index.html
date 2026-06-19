@@ -5,145 +5,64 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Смарт Ванна</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f9;
-            color: #333;
-            padding: 20px;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        .window {
-            background-color: #ffffff;
-            border: 2px solid #bdc3c7;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .window-title {
-            font-size: 16px;
-            font-weight: bold;
-            color: #7f8c8d;
-            margin-bottom: 10px;
-        }
-        .window-value {
-            font-size: 24px;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-        .buttons-container {
-            margin-top: 30px;
-        }
-        button {
-            display: block;
-            width: 100%;
-            padding: 15px;
-            margin-bottom: 15px;
-            font-size: 18px;
-            font-weight: bold;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
-        button:hover {
-            opacity: 0.85;
-        }
-        .btn-start { background-color: #2ecc71; } /* Зеленая кнопка */
-        .btn-stop { background-color: #e74c3c; }  /* Красная кнопка */
-        .btn-idle { background-color: #3498db; }  /* Синяя кнопка */
+        body { font-family: Arial, sans-serif; background: #f4f6f9; text-align: center; padding: 20px; max-width: 500px; margin: 0 auto; }
+        .window { background: white; border: 2px solid #bdc3c7; padding: 20px; margin-bottom: 20px; border-radius: 10px; }
+        .title { font-size: 16px; font-weight: bold; color: #7f8c8d; margin-bottom: 10px; }
+        .value { font-size: 22px; font-weight: bold; color: #2c3e50; }
+        button { width: 100%; padding: 15px; margin-bottom: 15px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 8px; cursor: pointer; }
+        .btn-start { background: #2ecc71; }
+        .btn-stop { background: #e74c3c; }
+        .btn-idle { background: #3498db; }
     </style>
 </head>
 <body>
 
-    <!-- 1. Окно состояние системы -->
     <div class="window">
-        <div class="window-title">1. Окно состояние системы</div>
-        <div class="window-value" id="status-window">Загрузка...</div>
+        <div class="title">1. Окно состояние системы</div>
+        <div class="value" id="status-window">Загрузка...</div>
     </div>
 
-    <!-- 2. Окно температура воды -->
     <div class="window">
-        <div class="window-title">2. Окно температура воды</div>
-        <div class="window-value" id="temp-window">--</div>
+        <div class="title">2. Окно температура воды</div>
+        <div class="value" id="temp-window">--</div>
     </div>
 
-    <!-- Кнопки управления по ТЗ -->
-    <div class="buttons-container">
-        <button class="btn-start" onclick="setSystemState('filling')">1. Начало набора воды</button>
-        <button class="btn-stop" onclick="setSystemState('stopped')">2. Прекратить подачу воды</button>
-        <button class="btn-idle" onclick="setSystemState('idle')">3. Состояние покоя</button>
-    </div>
+    <button class="btn-start" onclick="setState('filling')">1. Начало набора воды</button>
+    <button class="btn-stop" onclick="setState('stopped')">2. Прекратить подачу воды</button>
+    <button class="btn-idle" onclick="setState('idle')">3. Состояние покоя</button>
 
     <script>
-        // Ссылка на вашу базу Firebase
-        const firebaseUrl = "https://smartbath-7cde1-default-rtdb.firebaseio.com";
-        
-        let currentSystemState = "idle"; // По умолчанию состояние покоя
+        const db = "https://smartbath-7cde1-default-rtdb.firebaseio.com";
+        let currentState = "idle";
 
-        // Функция отправки команды по кнопкам в базу Firebase
-        function setSystemState(newState) {
-            fetch(`${firebaseUrl}/system_state.json`, {
-                method: 'PUT',
-                body: JSON.stringify(newState)
-            }).then(() => {
-                updateUI(); // Мгновенно обновляем окна после клика
-            }).catch(err => console.error("Ошибка при отправке: ", err));
+        function setState(state) {
+            fetch(`${db}/system_state.json`, { method: 'PUT', body: JSON.stringify(state) })
+                .then(() => updateUI());
         }
 
-        // Функция чтения данных из базы и обновления окон
         function updateUI() {
-            // 1. Читаем состояние
-            fetch(`${firebaseUrl}/system_state.json`)
-                .then(response => response.json())
-                .then(state => {
-                    // Если пусто, ставим состояние по умолчанию
-                    if (!state) state = "idle"; 
-                    currentSystemState = state;
-                    
-                    let statusText = "Неизвестно";
-                    
-                    // Перевод состояния в текст для Окна 1 по ТЗ
-                    if (state === "idle") {
-                        statusText = "В покое";
-                    } else if (state === "filling") {
-                        statusText = "Начало набора воды";
-                    } else if (state === "filled") {
-                        statusText = "Конец набора воды";
-                    } else if (state === "stopped") {
-                        statusText = "Подача воды прекращена";
-                    }
-                    
-                    document.getElementById('status-window').innerText = statusText;
+            fetch(`${db}/system_state.json`).then(r => r.json()).then(state => {
+                if (!state) state = "idle";
+                currentState = state;
+                
+                let text = "В покое";
+                if (state === "filling") text = "Начало набора воды";
+                if (state === "filled") text = "Конец набора воды";
+                if (state === "stopped") text = "Подача воды прекращена";
+                document.getElementById('status-window').innerText = text;
 
-                    // 2. Читаем температуру из базы
-                    return fetch(`${firebaseUrl}/temperature.json`);
-                })
-                .then(response => response.json())
-                .then(temp => {
-                    let tempElement = document.getElementById('temp-window');
-                    
-                    // Логика отображения температуры для Окна 2 по ТЗ
-                    if (currentSystemState === "idle") {
-                        tempElement.innerText = "Температура не измеряется";
-                    } else {
-                        if (temp) {
-                            tempElement.innerText = temp + " °C";
-                        } else {
-                            tempElement.innerText = "Ожидание данных...";
-                        }
-                    }
-                })
-                .catch(err => console.error("Ошибка Firebase: ", err));
+                return fetch(`${db}/temperature.json`);
+            }).then(r => r.json()).then(temp => {
+                let tempWin = document.getElementById('temp-window');
+                if (currentState === "idle") {
+                    tempWin.innerText = "Температура не измеряется";
+                } else {
+                    tempWin.innerText = temp ? temp + " °C" : "Ожидание...";
+                }
+            });
         }
 
-        // Автоматически опрашивать базу каждую секунду
-        // (Окно температуры будет автоматически выводить изменение температуры)
-        setInterval(updateUI, 1000);
-        
-        // Первый запуск при открытии страницы
+        setInterval(updateUI, 1000); // Обновление сайта раз в секунду
         updateUI();
     </script>
 </body>
