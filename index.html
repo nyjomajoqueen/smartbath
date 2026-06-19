@@ -1,160 +1,150 @@
-<!DOCTYPE HTML>
-<html>
+<!DOCTYPE html>
+<html lang="ru">
 <head>
-  <title>SmartBath Control Panel</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta charset="utf-8">
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background: #f4f4f4; color: #2c3e50; }
-    h1 { color: #333; }
-    .card { background: white; padding: 20px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin: 10px; width: 300px; vertical-align: top; }
-    .status { font-size: 24px; font-weight: bold; margin: 20px; min-height: 35px; }
-    .btn-container { margin-top: 30px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
-    .btn { color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; cursor: pointer; text-decoration: none; transition: background 0.2s; width: 280px; font-weight: bold; }
-    .btn-start { background: #2ecc71; }
-    .btn-start:hover { background: #27ae60; }
-    .btn-stop { background: #e74c3c; }
-    .btn-stop:hover { background: #c0392b; }
-    .btn-idle { background: #7f8c8d; }
-    .btn-idle:hover { background: #95a5a6; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Смарт Ванна</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .window {
+            background-color: #ffffff;
+            border: 2px solid #bdc3c7;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .window-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #7f8c8d;
+            margin-bottom: 10px;
+        }
+        .window-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .buttons-container {
+            margin-top: 30px;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover {
+            opacity: 0.85;
+        }
+        .btn-start { background-color: #2ecc71; } /* Зеленая кнопка */
+        .btn-stop { background-color: #e74c3c; }  /* Красная кнопка */
+        .btn-idle { background-color: #3498db; }  /* Синяя кнопка */
+    </style>
 </head>
 <body>
-  <h1>Панель управления SmartBath</h1>
-  
-  <div class="card">
-    <h3>Состояние системы</h3>
-    <div id="status-text" class="status" style="color: #7f8c8d;">В покое</div>
-  </div>
 
-  <div class="card">
-    <h3>Температура воды</h3>
-    <div id="temp-text" class="status" style="color: #7f8c8d;">не измеряется</div>
-  </div>
+    <!-- 1. Окно состояние системы -->
+    <div class="window">
+        <div class="window-title">1. Окно состояние системы</div>
+        <div class="window-value" id="status-window">Загрузка...</div>
+    </div>
 
-  <div class="btn-container">
-    <button class="btn btn-start" onclick="startFilling()">Начало набора воды</button>
-    <button class="btn btn-stop" onclick="stopFilling()">Прекратить подачу воды</button>
-    <button class="btn btn-idle" onclick="setRestState()">Состояние покоя</button>
-  </div>
+    <!-- 2. Окно температура воды -->
+    <div class="window">
+        <div class="window-title">2. Окно температура воды</div>
+        <div class="window-value" id="temp-window">--</div>
+    </div>
 
-  <script>
-    // Конфигурация Firebase
-    const firebaseConfig = {
-      apiKey: "AIzaSyDvXE9Fkod5YTSEsSbGjY-Gxm_lC6qCuz8",
-      databaseURL: "https://smartbath-7cde1-default-rtdb.firebaseio.com/"
-    };
-    
-    firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
+    <!-- Кнопки управления по ТЗ -->
+    <div class="buttons-container">
+        <button class="btn-start" onclick="setSystemState('filling')">1. Начало набора воды</button>
+        <button class="btn-stop" onclick="setSystemState('stopped')">2. Прекратить подачу воды</button>
+        <button class="btn-idle" onclick="setSystemState('idle')">3. Состояние покоя</button>
+    </div>
 
-    const statusText = document.getElementById("status-text");
-    const tempText = document.getElementById("temp-text");
-
-    let lastDisplayedTemp = null; // Температура на экране
-    let isFillingActive = false;  // Локальный флаг: идет ли сейчас активный набор воды
-
-    // Фильтр температуры (изменение >= 0.3°C)
-    function processTemperature(newTemp) {
-      if (newTemp === undefined || newTemp <= -50.0 || newTemp >= 100.0 || newTemp === 0.0) {
-        return; 
-      }
-
-      if (lastDisplayedTemp === null) {
-        lastDisplayedTemp = newTemp;
-        tempText.innerHTML = lastDisplayedTemp.toFixed(1) + " &deg;C";
-        tempText.style.color = "#2980b9";
-      } else {
-        const difference = Math.abs(newTemp - lastDisplayedTemp);
-        if (difference >= 0.3) {
-          lastDisplayedTemp = newTemp;
-          tempText.innerHTML = lastDisplayedTemp.toFixed(1) + " &deg;C";
-          tempText.style.color = "#2980b9";
-        }
-      }
-    }
-
-    // Слушатель базы данных Firebase
-    database.ref("smartbath").on("value", (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
+    <script>
+        // Ссылка на вашу базу Firebase
+        const firebaseUrl = "https://smartbath-7cde1-default-rtdb.firebaseio.com";
         
-        // 1. Статус в базе: Открыт / Наполнение (IDLE или RESET)
-        if (data.status === "IDLE" || data.status === "RESET") {
-          if (isFillingActive) {
-            // Если была нажата кнопка «Начало набора воды»
-            statusText.innerText = "Идет набор воды...";
-            statusText.style.color = "#2ecc71";
-            
-            if (data.temp !== undefined) {
-              processTemperature(data.temp);
-            } else {
-              tempText.innerText = "измеряется...";
-              tempText.style.color = "#2980b9";
-            }
-          } else {
-            // Если была нажата кнопка «Состояние покоя» (клапан открыт, но мы не набираем активно)
-            statusText.innerText = "В покое";
-            statusText.style.color = "#7f8c8d";
-            tempText.innerText = "не измеряется";
-            tempText.style.color = "#7f8c8d";
-            lastDisplayedTemp = null;
-          }
-        } 
-        // 2. Сработал датчик на воду (WET_ALARM) или ручной стоп (SHUT_OFF) — Клапан закрыт
-        else if (data.status === "WET_ALARM" || data.status === "SHUT_OFF") {
-          isFillingActive = false; // При любом закрытии сбрасываем режим набора
-          statusText.innerText = "Набор воды прекращен";
-          statusText.style.color = "#e74c3c";
-          
-          if (lastDisplayedTemp !== null) {
-            tempText.innerHTML = lastDisplayedTemp.toFixed(1) + " &deg;C";
-            tempText.style.color = "#2c3e50";
-          } else if (data.temp !== undefined) {
-            processTemperature(data.temp);
-          } else {
-            tempText.innerText = "не измеряется";
-            tempText.style.color = "#7f8c8d";
-          }
-        } 
-        // 3. Любой другой неопределенный статус (Покой)
-        else {
-          isFillingActive = false;
-          statusText.innerText = "В покое";
-          statusText.style.color = "#7f8c8d";
-          tempText.innerText = "не измеряется";
-          tempText.style.color = "#7f8c8d";
-          lastDisplayedTemp = null;
+        let currentSystemState = "idle"; // По умолчанию состояние покоя
+
+        // Функция отправки команды по кнопкам в базу Firebase
+        function setSystemState(newState) {
+            fetch(`${firebaseUrl}/system_state.json`, {
+                method: 'PUT',
+                body: JSON.stringify(newState)
+            }).then(() => {
+                updateUI(); // Мгновенно обновляем окна после клика
+            }).catch(err => console.error("Ошибка при отправке: ", err));
         }
-      }
-    });
 
-    // Нажатие: Начало набора воды (Открывает клапан, запускает режим наполнения)
-    function startFilling() {
-      lastDisplayedTemp = null; 
-      isFillingActive = true; 
-      database.ref("smartbath").update({
-        status: "RESET"
-      });
-    }
+        // Функция чтения данных из базы и обновления окон
+        function updateUI() {
+            // 1. Читаем состояние
+            fetch(`${firebaseUrl}/system_state.json`)
+                .then(response => response.json())
+                .then(state => {
+                    // Если пусто, ставим состояние по умолчанию
+                    if (!state) state = "idle"; 
+                    currentSystemState = state;
+                    
+                    let statusText = "Неизвестно";
+                    
+                    // Перевод состояния в текст для Окна 1 по ТЗ
+                    if (state === "idle") {
+                        statusText = "В покое";
+                    } else if (state === "filling") {
+                        statusText = "Начало набора воды";
+                    } else if (state === "filled") {
+                        statusText = "Конец набора воды";
+                    } else if (state === "stopped") {
+                        statusText = "Подача воды прекращена";
+                    }
+                    
+                    document.getElementById('status-window').innerText = statusText;
 
-    // Нажатие: Прекратить подачу воды (Закрывает клапан, отключает зуммер, пишет «Набор прекращен»)
-    function stopFilling() {
-      isFillingActive = false;
-      database.ref("smartbath").update({
-        status: "SHUT_OFF"
-      });
-    }
+                    // 2. Читаем температуру из базы
+                    return fetch(`${firebaseUrl}/temperature.json`);
+                })
+                .then(response => response.json())
+                .then(temp => {
+                    let tempElement = document.getElementById('temp-window');
+                    
+                    // Логика отображения температуры для Окна 2 по ТЗ
+                    if (currentSystemState === "idle") {
+                        tempElement.innerText = "Температура не измеряется";
+                    } else {
+                        if (temp) {
+                            tempElement.innerText = temp + " °C";
+                        } else {
+                            tempElement.innerText = "Ожидание данных...";
+                        }
+                    }
+                })
+                .catch(err => console.error("Ошибка Firebase: ", err));
+        }
 
-    // Нажатие: Состояние покоя (Открывает клапан на плате, но переводит сайт в режим покоя)
-    function setRestState() {
-      isFillingActive = false;
-      database.ref("smartbath").update({
-        status: "RESET"
-      });
-    }
-  </script>
+        // Автоматически опрашивать базу каждую секунду
+        // (Окно температуры будет автоматически выводить изменение температуры)
+        setInterval(updateUI, 1000);
+        
+        // Первый запуск при открытии страницы
+        updateUI();
+    </script>
 </body>
 </html>
