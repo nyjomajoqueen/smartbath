@@ -5,60 +5,183 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Смарт Ванна</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f4f6f9; text-align: center; padding: 20px; max-width: 500px; margin: 0 auto; }
-        .window { background: white; border: 2px solid #bdc3c7; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .title { font-size: 16px; font-weight: bold; color: #7f8c8d; margin-bottom: 10px; }
-        .value { font-size: 22px; font-weight: bold; color: #2c3e50; transition: color 0.3s; }
-        button { width: 100%; padding: 15px; margin-bottom: 15px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 8px; cursor: pointer; transition: opacity 0.2s; }
-        button:hover { opacity: 0.85; }
-        .btn-start { background: #2ecc71; } 
-        .btn-stop { background: #e74c3c; } 
-        .btn-idle { background: #3498db; }
+        /* Мягкий приглушенный фон-градиент */
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(180deg, #e6eff9 0%, #cfe1f3 100%); 
+            text-align: center; 
+            padding: 20px; 
+            max-width: 480px; 
+            margin: 0 auto;
+            min-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            color: #4a5568;
+        }
+
+        /* Эффект матового стекла для карточек */
+        .window { 
+            background: rgba(255, 255, 255, 0.65); 
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            padding: 22px; 
+            margin-bottom: 20px; 
+            border-radius: 16px; 
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+        }
+
+        .title { 
+            font-size: 14px; 
+            font-weight: 600; 
+            color: #718096; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px; 
+        }
+
+        .value { 
+            font-size: 20px; 
+            font-weight: bold; 
+            color: #2d3748; 
+        }
+
+        .buttons-container {
+            margin-top: 10px;
+        }
+
+        /* Кнопки с приглушенными цветами */
+        button { 
+            width: 100%; 
+            padding: 16px; 
+            margin-bottom: 14px; 
+            font-size: 16px; 
+            font-weight: 600; 
+            color: white; 
+            border: none; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            transition: transform 0.1s, opacity 0.2s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        }
+        
+        button:active {
+            transform: scale(0.98);
+        }
+
+        /* Приглушенный коралловый */
+        .btn-stop { 
+            background-color: #d37a72; 
+        } 
+        
+        /* Приглушенный стальной/синий */
+        .btn-idle { 
+            background-color: #7b9cb5; 
+        } 
+
+        /* АНИМАЦИЯ ПУЗЫРЬКОВ */
+        .bubble-wrapper {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1; /* Пузыри строго на заднем фоне */
+            pointer-events: none;
+        }
+
+        .bubble {
+            position: absolute;
+            bottom: -100px;
+            background: rgba(255, 255, 255, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            border-radius: 50%;
+            animation: floatUp 15s infinite ease-in;
+        }
+
+        /* Разные размеры и время для пузырей */
+        .bubble:nth-child(1) { left: 10%; width: 40px; height: 40px; animation-delay: 0s; animation-duration: 14s; }
+        .bubble:nth-child(2) { left: 25%; width: 20px; height: 20px; animation-delay: 3s; animation-duration: 18s; }
+        .bubble:nth-child(3) { left: 40%; width: 55px; height: 55px; animation-delay: 1s; animation-duration: 22s; }
+        .bubble:nth-child(4) { left: 60%; width: 30px; height: 30px; animation-delay: 5s; animation-duration: 16s; }
+        .bubble:nth-child(5) { left: 75%; width: 45px; height: 45px; animation-delay: 2s; animation-duration: 20s; }
+        .bubble:nth-child(6) { left: 90%; width: 25px; height: 25px; animation-delay: 7s; animation-duration: 15s; }
+        .bubble:nth-child(7) { left: 15%; width: 35px; height: 35px; animation-delay: 9s; animation-duration: 19s; }
+        .bubble:nth-child(8) { left: 50%; width: 50px; height: 50px; animation-delay: 11s; animation-duration: 21s; }
+
+        @keyframes floatUp {
+            0% {
+                transform: translateY(0) scale(1);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-120vh) scale(0.6);
+                opacity: 0;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <div class="window">
-        <div class="title">1. Окно состояние системы</div>
-        <div class="value" id="status-window">Подключение к базе...</div>
+    <!-- Задний фон с летающими пузырями -->
+    <div class="bubble-wrapper">
+        <div class="bubble"></div>
+        <div class="bubble"></div>
+        <div class="bubble"></div>
+        <div class="bubble"></div>
+        <div class="bubble"></div>
+        <div class="bubble"></div>
+        <div class="bubble"></div>
+        <div class="bubble"></div>
     </div>
 
+    <!-- Состояние системы -->
     <div class="window">
-        <div class="title">2. Окно температура воды</div>
+        <div class="title">Состояние системы</div>
+        <div class="value" id="status-window">Подключение...</div>
+    </div>
+
+    <!-- Температура воды -->
+    <div class="window">
+        <div class="title">Температура воды</div>
         <div class="value" id="temp-window">--</div>
     </div>
 
-    <button class="btn-start" onclick="sendCommand('filling')">1. Начало набора воды</button>
-    <button class="btn-stop" onclick="sendCommand('stopped')">2. Прекратить подачу воды</button>
-    <button class="btn-idle" onclick="sendCommand('idle')">3. Состояние покоя</button>
+    <!-- Кнопки управления без номеров -->
+    <div class="buttons-container">
+        <button class="btn-stop" onclick="sendCommand('stopped')">Прекратить подачу воды</button>
+        <button class="btn-idle" onclick="sendCommand('idle')">Состояние покоя</button>
+    </div>
 
     <script>
         const dbUrl = "https://smartbath-7cde1-default-rtdb.firebaseio.com";
         
-        // Локальные переменные для хранения текущих значений
         let currentState = "idle";
         let currentTemp = null;
 
-        // 1. Функция отправки команд (записывает в базу)
         function sendCommand(newState) {
             fetch(`${dbUrl}/system_state.json`, { 
                 method: 'PUT', 
                 body: JSON.stringify(newState) 
             });
-            // Нам не нужно обновлять сайт здесь вручную. 
-            // Как только база обновится, она сама пришлет нам новые данные!
         }
 
-        // 2. Функция отрисовки окон на сайте
         function renderUI() {
-            // Отрисовка статуса
             let text = "В покое";
             if (currentState === "filling") text = "Начало набора воды";
             if (currentState === "filled") text = "Конец набора воды";
             if (currentState === "stopped") text = "Подача воды прекращена";
             document.getElementById('status-window').innerText = text;
 
-            // Отрисовка температуры
             let tempWin = document.getElementById('temp-window');
             if (currentState === "idle") {
                 tempWin.innerText = "Температура не измеряется";
@@ -67,34 +190,27 @@
             }
         }
 
-        // 3. МАГИЯ: Подключение "Потока" (Stream) к Firebase
-        // Сайт открывает канал связи и ждет. Никаких таймеров и лишних запросов!
+        // Подключение потока к Firebase
         const stream = new EventSource(`${dbUrl}/.json`);
 
-        // Срабатывает ТОЛЬКО тогда, когда в базе что-то меняется
         stream.addEventListener('put', function(event) {
             const payload = JSON.parse(event.data);
 
-            // При первом запуске база присылает все данные сразу (path: "/")
             if (payload.path === "/") {
                 if (payload.data) {
                     if (payload.data.system_state) currentState = payload.data.system_state;
                     if (payload.data.temperature) currentTemp = payload.data.temperature;
                 }
             } 
-            // Если плата изменила ТОЛЬКО статус
             else if (payload.path === "/system_state") {
                 currentState = payload.data;
             } 
-            // Если плата прислала ТОЛЬКО новую температуру
             else if (payload.path === "/temperature") {
                 currentTemp = payload.data;
             }
 
-            // Обновляем экран только после получения новых данных
             renderUI();
         });
-
     </script>
 </body>
 </html>
