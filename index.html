@@ -92,7 +92,7 @@
             tempText.style.color = "#2980b9";
           }
         } 
-        // 2. Сработал датчик на перелив (WET_ALARM) — зуммер пищит, клапан перекрыт
+        // 2. Сработал датчик на перелив (WET_ALARM)
         else if (data.status === "WET_ALARM") {
           statusText.innerText = "Набор воды прекращен";
           statusText.style.color = "#e74c3c";
@@ -107,8 +107,32 @@
             tempText.style.color = "#7f8c8d";
           }
         } 
-        // 3. Выключено принудительно или Система в покое (SHUT_OFF или любой другой статус)
-        // В этом режиме зуммер на плате молчит, клапан закрыт
+        // 3. Клапан закрыт по команде (SHUT_OFF)
+        else if (data.status === "SHUT_OFF") {
+          // Разделяем визуальное отображение в зависимости от того, какая кнопка нажата
+          if (data.ui_status === "REST") {
+            statusText.innerText = "В покое";
+            statusText.style.color = "#7f8c8d";
+            tempText.innerText = "не измеряется";
+            tempText.style.color = "#7f8c8d";
+            lastDisplayedTemp = null;
+          } else {
+            // Если ui_status === "STOP" (нажата кнопка «Прекратить подачу воды»)
+            statusText.innerText = "Набор воды прекращен";
+            statusText.style.color = "#e74c3c";
+            
+            if (lastDisplayedTemp !== null) {
+              tempText.innerHTML = lastDisplayedTemp.toFixed(1) + " &deg;C";
+              tempText.style.color = "#2c3e50";
+            } else if (data.temp !== undefined) {
+              processTemperature(data.temp);
+            } else {
+              tempText.innerText = "не измеряется";
+              tempText.style.color = "#7f8c8d";
+            }
+          }
+        }
+        // 4. Любой другой неопределенный статус
         else {
           statusText.innerText = "В покое";
           statusText.style.color = "#7f8c8d";
@@ -123,21 +147,24 @@
     function startFilling() {
       lastDisplayedTemp = null; 
       database.ref("smartbath").update({
-        status: "RESET"
+        status: "RESET",
+        ui_status: "FILL"
       });
     }
 
-    // Нажатие: Прекратить подачу воды (Закрывает клапан, отключает зуммер)
+    // Нажатие: Прекратить подачу воды (Закрывает клапан, отключает зуммер, пишет «Набор прекращен»)
     function stopFilling() {
       database.ref("smartbath").update({
-        status: "SHUT_OFF"
+        status: "SHUT_OFF",
+        ui_status: "STOP"
       });
     }
 
-    // Нажатие: Состояние покоя (Переводит систему в покой, закрывает клапан, отключает зуммер)
+    // Нажатие: Состояние покоя (Закрывает клапан, отключает зуммер, пишет «В покое»)
     function setRestState() {
       database.ref("smartbath").update({
-        status: "SHUT_OFF"
+        status: "SHUT_OFF",
+        ui_status: "REST"
       });
     }
   </script>
