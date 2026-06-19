@@ -6,12 +6,13 @@
     <title>Смарт Ванна</title>
     <style>
         body { font-family: Arial, sans-serif; background: #f4f6f9; text-align: center; padding: 20px; max-width: 500px; margin: 0 auto; }
-        .window { background: white; border: 2px solid #bdc3c7; padding: 20px; margin-bottom: 20px; border-radius: 10px; }
+        .window { background: white; border: 2px solid #bdc3c7; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .title { font-size: 16px; font-weight: bold; color: #7f8c8d; margin-bottom: 10px; }
-        .value { font-size: 22px; font-weight: bold; color: #2c3e50; }
-        button { width: 100%; padding: 15px; margin-bottom: 15px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 8px; cursor: pointer; }
-        .btn-start { background: #2ecc71; }
-        .btn-stop { background: #e74c3c; }
+        .value { font-size: 22px; font-weight: bold; color: #2c3e50; transition: color 0.3s; }
+        button { width: 100%; padding: 15px; margin-bottom: 15px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 8px; cursor: pointer; transition: opacity 0.2s; }
+        button:hover { opacity: 0.85; }
+        .btn-start { background: #2ecc71; } 
+        .btn-stop { background: #e74c3c; } 
         .btn-idle { background: #3498db; }
     </style>
 </head>
@@ -19,7 +20,7 @@
 
     <div class="window">
         <div class="title">1. Окно состояние системы</div>
-        <div class="value" id="status-window">Загрузка...</div>
+        <div class="value" id="status-window">Подключение к базе...</div>
     </div>
 
     <div class="window">
@@ -27,43 +28,73 @@
         <div class="value" id="temp-window">--</div>
     </div>
 
-    <button class="btn-start" onclick="setState('filling')">1. Начало набора воды</button>
-    <button class="btn-stop" onclick="setState('stopped')">2. Прекратить подачу воды</button>
-    <button class="btn-idle" onclick="setState('idle')">3. Состояние покоя</button>
+    <button class="btn-start" onclick="sendCommand('filling')">1. Начало набора воды</button>
+    <button class="btn-stop" onclick="sendCommand('stopped')">2. Прекратить подачу воды</button>
+    <button class="btn-idle" onclick="sendCommand('idle')">3. Состояние покоя</button>
 
     <script>
-        const db = "https://smartbath-7cde1-default-rtdb.firebaseio.com";
+        const dbUrl = "https://smartbath-7cde1-default-rtdb.firebaseio.com";
+        
+        // Локальные переменные для хранения текущих значений
         let currentState = "idle";
+        let currentTemp = null;
 
-        function setState(state) {
-            fetch(`${db}/system_state.json`, { method: 'PUT', body: JSON.stringify(state) })
-                .then(() => updateUI());
-        }
-
-        function updateUI() {
-            fetch(`${db}/system_state.json`).then(r => r.json()).then(state => {
-                if (!state) state = "idle";
-                currentState = state;
-                
-                let text = "В покое";
-                if (state === "filling") text = "Начало набора воды";
-                if (state === "filled") text = "Конец набора воды";
-                if (state === "stopped") text = "Подача воды прекращена";
-                document.getElementById('status-window').innerText = text;
-
-                return fetch(`${db}/temperature.json`);
-            }).then(r => r.json()).then(temp => {
-                let tempWin = document.getElementById('temp-window');
-                if (currentState === "idle") {
-                    tempWin.innerText = "Температура не измеряется";
-                } else {
-                    tempWin.innerText = temp ? temp + " °C" : "Ожидание...";
-                }
+        // 1. Функция отправки команд (записывает в базу)
+        function sendCommand(newState) {
+            fetch(`${dbUrl}/system_state.json`, { 
+                method: 'PUT', 
+                body: JSON.stringify(newState) 
             });
+            // Нам не нужно обновлять сайт здесь вручную. 
+            // Как только база обновится, она сама пришлет нам новые данные!
         }
 
-        setInterval(updateUI, 1000); // Обновление сайта раз в секунду
-        updateUI();
+        // 2. Функция отрисовки окон на сайте
+        function renderUI() {
+            // Отрисовка статуса
+            let text = "В покое";
+            if (currentState === "filling") text = "Начало набора воды";
+            if (currentState === "filled") text = "Конец набора воды";
+            if (currentState === "stopped") text = "Подача воды прекращена";
+            document.getElementById('status-window').innerText = text;
+
+            // Отрисовка температуры
+            let tempWin = document.getElementById('temp-window');
+            if (currentState === "idle") {
+                tempWin.innerText = "Температура не измеряется";
+            } else {
+                tempWin.innerText = currentTemp ? currentTemp + " °C" : "Ожидание данных...";
+            }
+        }
+
+        // 3. МАГИЯ: Подключение "Потока" (Stream) к Firebase
+        // Сайт открывает канал связи и ждет. Никаких таймеров и лишних запросов!
+        const stream = new EventSource(`${dbUrl}/.json`);
+
+        // Срабатывает ТОЛЬКО тогда, когда в базе что-то меняется
+        stream.addEventListener('put', function(event) {
+            const payload = JSON.parse(event.data);
+
+            // При первом запуске база присылает все данные сразу (path: "/")
+            if (payload.path === "/") {
+                if (payload.data) {
+                    if (payload.data.system_state) currentState = payload.data.system_state;
+                    if (payload.data.temperature) currentTemp = payload.data.temperature;
+                }
+            } 
+            // Если плата изменила ТОЛЬКО статус
+            else if (payload.path === "/system_state") {
+                currentState = payload.data;
+            } 
+            // Если плата прислала ТОЛЬКО новую температуру
+            else if (payload.path === "/temperature") {
+                currentTemp = payload.data;
+            }
+
+            // Обновляем экран только после получения новых данных
+            renderUI();
+        });
+
     </script>
 </body>
 </html>
