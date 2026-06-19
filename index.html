@@ -41,7 +41,6 @@
   </div>
 
   <script>
-    // Конфигурация Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyDvXE9Fkod5YTSEsSbGjY-Gxm_lC6qCuz8",
       databaseURL: "https://smartbath-7cde1-default-rtdb.firebaseio.com/"
@@ -53,9 +52,10 @@
     const statusText = document.getElementById("status-text");
     const tempText = document.getElementById("temp-text");
 
-    let lastDisplayedTemp = null; // Хранение текущей температуры на экране
+    let lastDisplayedTemp = null; // Температура на экране
+    let isStopModeActive = false; // Локальный флаг для кнопки прекращения подачи
 
-    // Функция фильтрации температуры (шаг изменения >= 0.3°C)
+    // Фильтр температуры (изменение >= 0.3°C)
     function processTemperature(newTemp) {
       if (newTemp === undefined || newTemp <= -50.0 || newTemp >= 100.0 || newTemp === 0.0) {
         return; 
@@ -75,7 +75,7 @@
       }
     }
 
-    // Слушатель базы данных Firebase
+    // Слушатель базы данных
     database.ref("smartbath").on("value", (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -107,17 +107,10 @@
             tempText.style.color = "#7f8c8d";
           }
         } 
-        // 3. Клапан закрыт по команде (SHUT_OFF)
+        // 3. Команда SHUT_OFF (кнопка Стоп или Покой)
         else if (data.status === "SHUT_OFF") {
-          // Разделяем визуальное отображение в зависимости от того, какая кнопка нажата
-          if (data.ui_status === "REST") {
-            statusText.innerText = "В покое";
-            statusText.style.color = "#7f8c8d";
-            tempText.innerText = "не измеряется";
-            tempText.style.color = "#7f8c8d";
-            lastDisplayedTemp = null;
-          } else {
-            // Если ui_status === "STOP" (нажата кнопка «Прекратить подачу воды»)
+          if (isStopModeActive) {
+            // Если была нажата кнопка «Прекратить подачу воды»
             statusText.innerText = "Набор воды прекращен";
             statusText.style.color = "#e74c3c";
             
@@ -130,9 +123,16 @@
               tempText.innerText = "не измеряется";
               tempText.style.color = "#7f8c8d";
             }
+          } else {
+            // Если была нажата кнопка «Состояние покоя»
+            statusText.innerText = "В покое";
+            statusText.style.color = "#7f8c8d";
+            tempText.innerText = "не измеряется";
+            tempText.style.color = "#7f8c8d";
+            lastDisplayedTemp = null;
           }
         }
-        // 4. Любой другой неопределенный статус
+        // 4. По умолчанию
         else {
           statusText.innerText = "В покое";
           statusText.style.color = "#7f8c8d";
@@ -143,28 +143,25 @@
       }
     });
 
-    // Нажатие: Начало набора воды (Открывает клапан)
     function startFilling() {
       lastDisplayedTemp = null; 
+      isStopModeActive = false; // Сбрасываем локальный флаг остановки
       database.ref("smartbath").update({
-        status: "RESET",
-        ui_status: "FILL"
+        status: "RESET"
       });
     }
 
-    // Нажатие: Прекратить подачу воды (Закрывает клапан, отключает зуммер, пишет «Набор прекращен»)
     function stopFilling() {
+      isStopModeActive = true; // Активируем локальный флаг остановки
       database.ref("smartbath").update({
-        status: "SHUT_OFF",
-        ui_status: "STOP"
+        status: "SHUT_OFF"
       });
     }
 
-    // Нажатие: Состояние покоя (Закрывает клапан, отключает зуммер, пишет «В покое»)
     function setRestState() {
+      isStopModeActive = false; // Отключаем локальный флаг остановки
       database.ref("smartbath").update({
-        status: "SHUT_OFF",
-        ui_status: "REST"
+        status: "SHUT_OFF"
       });
     }
   </script>
