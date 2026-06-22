@@ -1,145 +1,265 @@
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h> 
-#include <WiFiClientSecure.h>
-#include <FirebaseESP8266.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Смарт Ванна</title>
+    <style>
+        /* Главный фон */
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(180deg, #7a94a8 0%, #4a6275 100%); 
+            text-align: center; 
+            padding: 20px; 
+            margin: 0;
+            min-height: 94vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow-x: hidden;
+        }
 
-// Настройки сети и базы
-#define WIFI_SSID "dstmobile"
-#define WIFI_PASSWORD "mobile2148"
-#define FIREBASE_HOST "smartbath-7cde1-default-rtdb.firebaseio.com"
+        /* Контент поверх пузырей */
+        .content-container {
+            position: relative;
+            z-index: 2; 
+            width: 100%;
+            max-width: 440px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
 
-// Пины
-#define WATER_SENSOR_PIN D2 
-#define ONE_WIRE_BUS D3     
-#define LED_GREEN D4        
-#define LED_RED D5          
+        /* Название станции вверху */
+        .main-title {
+            font-size: 26px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-top: 10px;
+            margin-bottom: 25px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            letter-spacing: 0.5px;
+        }
 
-OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature sensors(&oneWire);
+        /* Карточки с эффектом стекла */
+        .window { 
+            background: rgba(255, 255, 255, 0.75); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            padding: 22px; 
+            margin-bottom: 20px; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
 
-// Объекты Firebase
-FirebaseData fbdo;   
-FirebaseData stream; 
-FirebaseAuth auth;
-FirebaseConfig config;
+        .title { 
+            font-size: 14px; 
+            font-weight: 600; 
+            color: #5a6578; 
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px; 
+        }
 
-String systemState = "idle";
-float lastTemp = -999.0;
-unsigned long lastTempTime = 0;
+        .value { 
+            font-size: 21px; 
+            font-weight: bold; 
+            color: #1a202c; 
+        }
 
-volatile bool sensorChanged = false;
+        .buttons-container {
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
 
-// Прерывание на изменение состояния воды
-void IRAM_ATTR waterISR() {
-  sensorChanged = true;
-}
+        /* Кнопки */
+        button { 
+            width: 100%; 
+            padding: 16px; 
+            margin-bottom: 14px; 
+            font-size: 16px; 
+            font-weight: 600; 
+            color: white; 
+            border: none; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            transition: transform 0.1s, opacity 0.2s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        
+        button:active {
+            transform: scale(0.98);
+        }
 
-// Отдельная функция для приема данных из базы
-void streamCallback(StreamData data) {
-  if (data.dataType() == "string") {
-    systemState = data.stringData();
-  }
-}
-void streamTimeoutCallback(bool timeout) {}
+        .btn-stop { 
+            background-color: #d37a72; 
+        } 
+        
+        .btn-idle { 
+            background-color: #698da8; 
+        } 
 
-void sendToFirebase(String path, String val) {
-  WiFiClientSecure client;
-  client.setInsecure();
-  HTTPClient http;
-  if (http.begin(client, "https://" + String(FIREBASE_HOST) + path)) {
-    http.PUT(val);
-    http.end();
-  }
-}
+        /* Белая полоска в самом низу экрана */
+        .bottom-line {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background-color: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 -2px 10px rgba(255, 255, 255, 0.2);
+            z-index: 10;
+        }
 
-void setup() {
-  Serial.begin(115200);
-  pinMode(WATER_SENSOR_PIN, INPUT_PULLUP); 
-  pinMode(LED_GREEN, OUTPUT);
-  pinMode(LED_RED, OUTPUT);
+        /* Средний слой: пузыри */
+        .bubble-wrapper {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            z-index: 1; 
+            pointer-events: none;
+        }
 
-  sensors.begin();
-  digitalWrite(LED_GREEN, HIGH);
-  digitalWrite(LED_RED, LOW);
+        .bubble {
+            position: absolute;
+            bottom: -120px;
+            background: rgba(255, 255, 255, 0.45); 
+            border: 1px solid rgba(255, 255, 255, 0.6);  
+            border-radius: 50%;
+            animation: floatUp 15s infinite ease-in-out; 
+            box-shadow: inset 0 2px 5px rgba(255, 255, 255, 0.6); 
+        }
 
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) { delay(500); }
+        .bubble:nth-child(1) { left: 8%; width: 42px; height: 42px; animation-delay: 0s; animation-duration: 14s; }
+        .bubble:nth-child(2) { left: 22%; width: 20px; height: 20px; animation-delay: 3s; animation-duration: 18s; }
+        .bubble:nth-child(3) { left: 35%; width: 55px; height: 55px; animation-delay: 1s; animation-duration: 22s; }
+        .bubble:nth-child(4) { left: 52%; width: 28px; height: 28px; animation-delay: 5s; animation-duration: 16s; }
+        .bubble:nth-child(5) { left: 68%; width: 48px; height: 48px; animation-delay: 2s; animation-duration: 20s; }
+        .bubble:nth-child(6) { left: 85%; width: 24px; height: 24px; animation-delay: 7s; animation-duration: 15s; }
+        .bubble:nth-child(7) { left: 14%; width: 34px; height: 34px; animation-delay: 9s; animation-duration: 19s; }
+        .bubble:nth-child(8) { left: 78%; width: 52px; height: 52px; animation-delay: 11s; animation-duration: 21s; }
 
-  // Настройка Firebase
-  config.database_url = FIREBASE_HOST;
-  config.signer.test_mode = true; 
-  Firebase.begin(&config, &auth);
-  Firebase.reconnectWiFi(true);
-  
-  fbdo.setBSSLBufferSize(1024, 1024);
-  stream.setBSSLBufferSize(1024, 1024);
+        @keyframes floatUp {
+            0% {
+                transform: translateY(0) translateX(0) scale(1);
+                opacity: 0;
+            }
+            10% {
+                opacity: 0.85;
+            }
+            50% {
+                transform: translateY(-60vh) translateX(20px) scale(0.9);
+            }
+            90% {
+                opacity: 0.85;
+            }
+            100% {
+                transform: translateY(-120vh) translateX(-15px) scale(0.6);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
 
-  // Слушаем статус из базы
-  Firebase.setStreamCallback(stream, streamCallback, streamTimeoutCallback);
-  Firebase.beginStream(stream, "/system_state");
+    <!-- Слой 2: Пузыри -->
+    <div class="bubble-wrapper">
+        <div class="bubble"></div>
+        <div class="bubble"></div>
+        <div class="bubble"></div>
+        <div class="bubble"></div>
+        <div class="bubble"></div>
+        <div class="bubble"></div>
+        <div class="bubble"></div>
+        <div class="bubble"></div>
+    </div>
 
-  // ПО УМОЛЧАНИЮ: Проверяем датчик при старте и задаем статус
-  if (digitalRead(WATER_SENSOR_PIN) == HIGH) {
-    systemState = "filled";
-  } else {
-    systemState = "idle";
-  }
-  sendToFirebase("/system_state.json", "\"" + systemState + "\"");
-  
-  attachInterrupt(digitalPinToInterrupt(WATER_SENSOR_PIN), waterISR, CHANGE);
-}
+    <!-- Тонкая белая полоска на нижнем краю -->
+    <div class="bottom-line"></div>
 
-void loop() {
-  ESP.wdtFeed(); 
-  yield();       
+    <!-- Слой 3: Контент -->
+    <div class="content-container">
+        
+        <!-- Название станции -->
+        <h1 class="main-title">Станция "Smart Bath"</h1>
 
-  // 1. ОБРАБОТКА ВОДЫ (Прерывание)
-  if (sensorChanged) {
-    sensorChanged = false;
-    delay(100); // антидребезг
-    bool isWet = (digitalRead(WATER_SENSOR_PIN) == HIGH);
+        <!-- Состояние системы -->
+        <div class="window">
+            <div class="title">Состояние системы</div>
+            <div class="value" id="status-window">Подключение...</div>
+        </div>
 
-    if (isWet && systemState == "idle") {
-      systemState = "filled";
-      Firebase.setString(fbdo, "/system_state", "filled");
-    } 
-    else if (!isWet && systemState == "filled") {
-      systemState = "idle";
-      Firebase.setString(fbdo, "/system_state", "idle");
-    }
-  }
+        <!-- Температура воды -->
+        <div class="window">
+            <div class="title">Температура воды</div>
+            <div class="value" id="temp-window">--</div>
+        </div>
 
-  // 2. ЛОГИКА СВЕТОДИОДОВ (Зависит от статуса)
-  if (systemState == "idle") {
-    digitalWrite(LED_GREEN, HIGH);
-    digitalWrite(LED_RED, LOW);
-  } else {
-    digitalWrite(LED_GREEN, LOW);
-    digitalWrite(LED_RED, HIGH);
-  }
+        <!-- Кнопки управления -->
+        <div class="buttons-container">
+            <button class="btn-stop" onclick="sendCommand('stopped')">Прекратить подачу воды</button>
+            <button class="btn-idle" onclick="sendCommand('idle')">Состояние покоя</button>
+        </div>
+        
+    </div>
 
-  // 3. АБСОЛЮТНО НЕЗАВИСИМОЕ ИЗМЕРЕНИЕ ТЕМПЕРАТУРЫ (Работает всегда!)
-  if (millis() - lastTempTime > 2000) {
-    lastTempTime = millis();
-    sensors.requestTemperatures();
-    float t = sensors.getTempCByIndex(0);
-    
-    if (t != DEVICE_DISCONNECTED_C) {
-      // Ручной надежный расчет разницы
-      float diff = t - lastTemp;
-      if (diff < 0) {
-        diff = -diff; 
-      }
+    <script>
+        const dbUrl = "https://smartbath-7cde1-default-rtdb.firebaseio.com";
+        
+        let currentState = "idle";
+        let currentTemp = null;
 
-      // Отправляем температуру, если это первый запуск или разница >= 0.3
-      if (lastTemp == -999.0 || diff >= 0.3) {
-        lastTemp = t;
-        Firebase.setFloat(fbdo, "/temperature", t);
-        Serial.print("Температура обновлена: ");
-        Serial.println(t);
-      }
-    }
-  }
-}
+        function sendCommand(newState) {
+            fetch(`${dbUrl}/system_state.json`, { 
+                method: 'PUT', 
+                body: JSON.stringify(newState) 
+            });
+        }
+
+        function renderUI() {
+            let text = "В покое";
+            if (currentState === "filling") text = "Начало набора воды";
+            if (currentState === "filled") text = "Конец набора воды";
+            if (currentState === "stopped") text = "Подача воды прекращена";
+            document.getElementById('status-window').innerText = text;
+
+            let tempWin = document.getElementById('temp-window');
+            
+            // Выводим температуру с одним знаком после запятой
+            if (currentTemp !== null && currentTemp !== undefined) {
+                tempWin.innerText = Number(currentTemp).toFixed(1) + " °C";
+            } else {
+                tempWin.innerText = "Ожидание данных...";
+            }
+        }
+
+        // Подключение потока к Firebase
+        const stream = new EventSource(`${dbUrl}/.json`);
+
+        stream.addEventListener('put', function(event) {
+            const payload = JSON.parse(event.data);
+
+            if (payload.path === "/") {
+                if (payload.data) {
+                    if (payload.data.system_state) currentState = payload.data.system_state;
+                    if (payload.data.temperature !== undefined) currentTemp = payload.data.temperature;
+                }
+            } 
+            else if (payload.path === "/system_state") {
+                currentState = payload.data;
+            } 
+            else if (payload.path === "/temperature") {
+                currentTemp = payload.data;
+            }
+
+            renderUI();
+        });
+    </script>
+</body>
+</html>
