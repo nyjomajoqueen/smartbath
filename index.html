@@ -86,7 +86,7 @@
             border: none; 
             border-radius: 12px; 
             cursor: pointer; 
-            transition: transform 0.1s, opacity 0.2s;
+            transition: transform 0.1s, opacity 0.2s, background-color 0.3s;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
         
@@ -94,12 +94,17 @@
             transform: scale(0.98);
         }
 
+        /* ЦВЕТА КНОПОК ПО ТЗ */
         .btn-stop { 
-            background-color: #d37a72; 
+            background-color: #d37a72; /* Приглушенный красный */
         } 
         
+        .btn-resume {
+            background-color: #7da88a; /* Нежно-зеленый приглушенный */
+        }
+
         .btn-idle { 
-            background-color: #698da8; 
+            background-color: #698da8; /* Приглушенный синий */
         } 
 
         /* Белая полоска в самом низу экрана */
@@ -203,7 +208,8 @@
 
         <!-- Кнопки управления -->
         <div class="buttons-container">
-            <button class="btn-stop" onclick="sendCommand('stopped')">Прекратить подачу воды</button>
+            <!-- Кнопка теперь динамическая с ID="action-btn" -->
+            <button id="action-btn" class="btn-stop" onclick="toggleWater()">Прекратить подачу воды</button>
             <button class="btn-idle" onclick="sendCommand('idle')">Состояние покоя</button>
         </div>
         
@@ -215,6 +221,7 @@
         let currentState = "idle";
         let currentTemp = null;
 
+        // Отправка команд в базу
         function sendCommand(newState) {
             fetch(`${dbUrl}/system_state.json`, { 
                 method: 'PUT', 
@@ -222,20 +229,39 @@
             });
         }
 
+        // Функция-переключатель для динамической кнопки
+        function toggleWater() {
+            if (currentState === "stopped") {
+                sendCommand("idle"); // Если была остановлена — возобновляем (включаем покой/набор)
+            } else {
+                sendCommand("stopped"); // Если работала — останавливаем
+            }
+        }
+
         function renderUI() {
+            // Отрисовка статуса системы
             let text = "В покое";
             if (currentState === "filling") text = "Начало набора воды";
             if (currentState === "filled") text = "Конец набора воды";
             if (currentState === "stopped") text = "Подача воды прекращена";
             document.getElementById('status-window').innerText = text;
 
+            // Отрисовка температуры
             let tempWin = document.getElementById('temp-window');
-            
-            // Выводим температуру с одним знаком после запятой
             if (currentTemp !== null && currentTemp !== undefined) {
                 tempWin.innerText = Number(currentTemp).toFixed(1) + " °C";
             } else {
                 tempWin.innerText = "Ожидание данных...";
+            }
+
+            // ИСПРАВЛЕНО: Динамическое изменение текста и цвета кнопки по ТЗ
+            let actionBtn = document.getElementById('action-btn');
+            if (currentState === "stopped") {
+                actionBtn.innerText = "Возобновить подачу воды";
+                actionBtn.className = "btn-resume"; // Меняем класс на зеленый
+            } else {
+                actionBtn.innerText = "Прекратить подачу воды";
+                actionBtn.className = "btn-stop"; // Меняем класс на красный
             }
         }
 
